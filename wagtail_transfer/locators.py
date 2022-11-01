@@ -122,12 +122,24 @@ class FieldLocator:
         # A UID coming from JSON data will arrive as a list (because JSON has no tuple type),
         # but we need a tuple because the importer logic expects a hashable type that we can use
         # in sets and dict keys
+        if type(json_uid) is str:
+            json_uid = [json_uid]
         return tuple(json_uid)
 
     def find(self, uid):
         # pair up field names with their respective items in the UID tuple, to form a filter dict
         # that we can use for an ORM lookup
+        if type(uid) is str:
+            uid = tuple([uid])
         filters = dict(zip(self.fields, uid))
+
+        # Handle CustomImage objects with no PIA number.
+        # ----------------------------------------------
+        # We include `"base.CustomImage": ["pia_number"],` in WAGTAILTRANSFER_LOOKUP_FIELDS
+        # to ensure that images prom Photojournal are not duplicated by a WT import,
+        # and the below two lines make sure this doesn't cause images with a null `pia_number` to break.
+        if self.model.objects.filter(**filters).count() > 1:
+            return None
 
         try:
             return self.model.objects.get(**filters)
